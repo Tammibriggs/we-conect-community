@@ -1,114 +1,179 @@
+import LeftSide from "@/components/LeftSide";
+import { UserContext } from "@/providers/MyContext";
+import { configureAxios } from "@/utils/axiosInstance";
+import { Button, IconButton } from "@mui/material";
+import {
+  CircleNotch,
+  GlobeHemisphereEast,
+  Plus,
+  Robot,
+} from "@phosphor-icons/react";
+import Head from "next/head";
 import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+import React, { useContext, useEffect, useState } from "react";
+import Share from "@/components/Share";
+import communityData from "@/server/utils/communityData";
+import Feed from "@/components/Feed";
+import CommunityRules from "@/components/CommunityRules";
+import AutoMod from "@/components/AutoMod";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+function Community() {
+  const { user, setUser } = useContext(UserContext);
+  const axiosInstance = configureAxios(setUser);
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+  const [community, setCommunity] = useState();
+  const [posts, setPosts] = useState();
+  const [isCreatingRule, setIsCreatingRule] = useState(false);
+  const [isAutoMod, setIsAutoMod] = useState(false);
 
-export default function Home() {
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      getCommunity();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (community) {
+      (async () => {
+        try {
+          const res = await axiosInstance.get(
+            `/community-posts/?communityId=${communityData._id}`
+          );
+          setPosts(res.data);
+        } catch (err) {
+          setPosts(null);
+        }
+      })();
+    }
+  }, [community]);
+
+  const getCommunity = async () => {
+    try {
+      const res = await axiosInstance.get(`/communities/${communityData._id}`);
+      setCommunity(res.data);
+    } catch (err) {
+      setCommunity(null);
+    }
+  };
+
+  const createPost = async (content, media) => {
+    const formData = new FormData();
+
+    if (media) {
+      formData.append("media", media);
+    }
+
+    formData.append("content", content);
+    formData.append("communityId", communityData._id);
+    const res = await axiosInstance.post("/community-posts", formData);
+    setPosts([res.data, ...(posts ? posts : [])]);
+  };
+
+  const capitalizeFirstChar = () => {
+    if (community && user) {
+      const currentUser = community.members?.find(
+        (member) => member.userId === user._id
+      );
+      return (
+        currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1)
+      );
+    }
+    return "";
+  };
+
   return (
-    <div
-      className={`${geistSans.variable} ${geistMono.variable} grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]`}
-    >
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              pages/index.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <>
+      <Head>
+        <title>{community?.name || "Community"}</title>
+      </Head>
+      <div className="three-cols">
+        <LeftSide />
+        <div className="three-cols__center scrollbar-hidden mb-4">
+          <div className="w-full bg-teal-50 min-h-[400px] border-b border-solid border-slate-200 rounded-b-lg">
+            <div className="relative w-full h-[250px]">
+              <Image
+                src={community?.coverPicture?.url || "/assets/community.svg"}
+                alt="community"
+                className="object-cover bg-orange-100"
+                fill
+              />
+            </div>
+            <div className="p-3">
+              <div className="flex mb-2 items-center justify-between">
+                <h1 className="font-semibold text-2xl ">{community?.name}</h1>
+                <span className="px-2 py-1 border border-solid border-teal-500 rounded-full bg-teal-100 text-teal-600">
+                  {capitalizeFirstChar()}
+                </span>
+              </div>
+              <div className="flex items-center">
+                <span className="flex items-center gap-1 text-slate-600">
+                  <GlobeHemisphereEast size={15} /> Public
+                </span>
+                <span className="mb-2 mx-1">.</span>
+                <span className="">
+                  {community?.members?.length} Member
+                  {community?.members?.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              {community?.ownerId === user?._id && (
+                <Button
+                  variant="outlined"
+                  onClick={() => setIsAutoMod(true)}
+                  startIcon={<Robot size={25} />}
+                  className="flex ml-auto  rounded-full border-slate-400 normal-case gap-1 text-black items-center font-medium"
+                >
+                  Auto Moderation
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="mt-2 grid gap-[10px]">
+            <Share createPost={createPost} />
+            {!!posts?.length && <Feed posts={posts} />}
+            {posts === undefined && (
+              <CircleNotch
+                size={30}
+                className="text-teal-500 mx-auto mt-5 animate-spin"
+              />
+            )}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        <div className="three-cols__right">
+          <div className="p-3  rounded-xl bg-white border border-solid border-slate-200">
+            <div className="flex justify-between">
+              <h2 className="font-medium text-lg mb-2 ">Community Rules</h2>
+              {community?.ownerId === user?._id && (
+                <IconButton
+                  onClick={() => setIsCreatingRule(true)}
+                  className="p-1 h-fit rounded-full text-white bg-teal-500 cursor-pointer"
+                >
+                  <Plus weight="bold" size={15} />
+                </IconButton>
+              )}
+            </div>
+            <CommunityRules
+              rules={community?.rules}
+              ownerId={community?.ownerId}
+              isCreatingRule={isCreatingRule}
+              setIsCreatingRule={setIsCreatingRule}
+              getCommunity={getCommunity}
+            />
+          </div>
+        </div>
+      </div>
+      {console.log(community?.moderationFilters, "This is the moderation rule")}
+      <AutoMod
+        open={isAutoMod}
+        onClose={() => setIsAutoMod(false)}
+        filters={community?.moderationFilters}
+        getCommunity={getCommunity}
+      />
+    </>
   );
 }
+
+export default Community;
