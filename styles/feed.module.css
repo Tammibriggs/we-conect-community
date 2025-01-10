@@ -1,0 +1,22 @@
+.feed {
+  padding-bottom: 50px;
+  width: 100%;
+}
+
+.feed__wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (min-width: 500px) {
+  .feed {
+    padding-bottom: 10px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .feed {
+    flex: 40%;
+  }
+}
