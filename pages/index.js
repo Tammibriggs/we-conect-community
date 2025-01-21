@@ -79,7 +79,7 @@ function Community() {
         (member) => member.userId === user._id
       );
       return (
-        currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1)
+        currentUser?.role.charAt(0).toUpperCase() + currentUser?.role?.slice(1)
       );
     }
     return "";

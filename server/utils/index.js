@@ -1,5 +1,6 @@
 import fs from "fs";
 import CommunityPost from "../models/CommunityPost";
+import permit from "./permit";
 
 const runMiddleware = (req, res, fn) => {
   return new Promise((resolve, reject) => {
@@ -33,6 +34,8 @@ const deleteFile = (filePath) => {
   });
 };
 
+// Check if a post violates any of the violates any of the preset filter criteria
+// and return object containing the volated filter and criterias
 const evaluatePresetsCriteria = (post, filters) => {
   const violations = {};
 
@@ -89,7 +92,7 @@ const getTimeoutDuration = (durationString) => {
   const now = new Date();
   switch (durationString) {
     case "1-hour":
-      return new Date(now.getTime() * 60 * 60 * 1000);
+      return new Date(now.getTime() + 60 * 1000);
     case "1-day":
       return new Date(now.getTime() + 24 * 60 * 60 * 1000);
     case "1-week":
@@ -105,33 +108,46 @@ const checkPostForViolations = async (
 ) => {
   let violations = [];
   if (member.role !== "admin") {
+    member.restriction = member.restriction ? member.restriction : {};
     if (presets.enabled) {
       const filters = presets.options;
       const presetViolations = await evaluatePresetsCriteria(post, filters);
-      const spamViolations = presetViolations["Spam Filter"] || [];
-      const isSpam = spamViolations?.length > 0;
 
-      if (isSpam) {
-        violations = [...spamViolations];
-        member.role = "spammer";
-        filters.forEach((filter) => {
+      // Set the post status to rejected if any of the violated preset filters specifies a 'blockPosts' action
+      // and set the restrication end time to the combined timeout of all violated filters
+      if (Object.keys(presetViolations).length) {
+        violations = Object.values(presetViolations).flat();
+        const isBlockPost = filters.some(
+          (filter) =>
+            !!presetViolations[filter.name] &&
+            filter.actions.includes("blockPost")
+        );
+        if (isBlockPost) {
+          post.status = "rejected";
+        }
+
+        const combinedTimeout = filters.reduce((acc, filter) => {
           if (
-            filter.actions.includes("timeoutUser") &&
-            filter.actionConfig?.timeoutDuration
+            !!presetViolations[filter.name] &&
+            filter.actions.includes("timeoutUser")
           ) {
-            member.permissions.canPost = false;
-            member.restriction.reason = "Spam post";
-            member.restriction.endTime = getTimeoutDuration(
-              filter.actionConfig?.timeoutDuration
-            );
+            const timoutDuraction = getTimeoutDuration(
+              filter.actionConfig.timeoutDuration
+            ).getTime();
+
+            return acc + timoutDuraction;
           }
-          if (filter.actions.includes("blockPost")) {
-            post.status = "rejected";
-          }
-        });
+        }, 0);
+
+        if (combinedTimeout) {
+          member.restriction.endTime = new Date(combinedTimeout);
+        }
+        member.restriction.violationsCount += 1;
+        member.restriction.violations = violations;
       }
     }
   }
+
   return { post, member, violations };
 };
 

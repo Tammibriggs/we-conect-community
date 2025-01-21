@@ -83,28 +83,18 @@ const MembersSchema = new Schema({
   },
   role: {
     type: String,
-    enum: ["admin", "member", "spammer", "banned"],
+    enum: ["admin", "member"],
     default: "member",
-  },
-  permissions: {
-    canPost: {
-      type: Boolean,
-      default: true,
-    },
-    canReact: {
-      type: Boolean,
-      default: true,
-    },
   },
   restriction: {
     type: {
-      reason: {
-        type: String,
-        required: true,
+      violationsCount: {
+        type: Number,
+        default: 0,
       },
-      startTime: {
-        type: Date,
-        default: Date.now,
+      violations: {
+        type: Array,
+        required: true,
       },
       endTime: {
         type: Date,

@@ -5,6 +5,7 @@ import multer from "multer";
 import { checkPostForViolations, runMiddleware } from "@/server/utils";
 import Community from "@/server/models/Community";
 import User from "@/server/models/User";
+import permit from "@/server/utils/permit";
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -23,8 +24,8 @@ const createPost = async (req, res) => {
     const userId = req.userId;
     await runMiddleware(req, res, uploadMiddleware);
     const { content, communityId } = req.body;
-    const community = await Community.findById(communityId);
 
+    const community = await Community.findById(communityId);
     if (!community) {
       return res.status(404).json({ message: "Community not found" });
     }
@@ -32,29 +33,32 @@ const createPost = async (req, res) => {
     const memberIndex = community.members.findIndex(
       (member) => member.userId.toString() === userId
     );
+    let member = community.members[memberIndex];
+    const now = new Date();
+    const restrictionEndTime = member?.restriction?.endTime
+      ? new Date(member.restriction.endTime)
+      : null;
 
-    if (memberIndex === -1) {
-      return res
-        .status(403)
-        .json({ message: "You are not a member of this community" });
+    // Remove user restrication if the timeout has elapsed
+    if (restrictionEndTime && now > restrictionEndTime) {
+      member.restriction.endTime = undefined;
     }
 
-    let member = community.members[memberIndex];
-    const canPost = member.permissions.canPost;
+    const permitted = await permit.check(
+      {
+        key: userId,
+        attributes: {
+          role: member.role,
+          violations_count: member?.restriction?.violationsCount || 0,
+          timed_out: !!member?.restriction?.endTime,
+        },
+      },
+      "create-post",
+      "community"
+    );
 
-    if (!canPost) {
-      const now = new Date();
-      const restrictionEndTime = new Date(member.restriction.endTime);
-      if (member.role === "banned" || restrictionEndTime > now) {
-        return res.status(403).json({ message: "Permission denied" });
-      }
-      // Restriction has expired, reset status and permissions
-      member.permissions = {
-        canPost: true,
-        canComment: true,
-        canInvite: true,
-      };
-      delete member.restriction;
+    if (!permitted) {
+      return res.status(403).json({ message: "Permission denied" });
     }
 
     let media;

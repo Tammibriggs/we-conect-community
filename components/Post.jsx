@@ -5,6 +5,8 @@ import { useRouter } from "next/router";
 import { dateDifference, formatNumber } from "@/utils";
 import { configureAxios } from "@/utils/axiosInstance";
 import { UserContext } from "@/providers/MyContext";
+import { AxiosError } from "axios";
+import { toast } from "react-toastify";
 
 const Post = ({ id, author, likes, content, media, createdAt }) => {
   const router = useRouter();
@@ -13,31 +15,41 @@ const Post = ({ id, author, likes, content, media, createdAt }) => {
 
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
-  1;
+  const [like, setLike] = useState({ isLiked: false, likeCount: 0 });
+
   useEffect(() => {
-    setIsLiked(likes.includes(user._id));
-    setLikeCount(likes.length);
+    setLike({ isLiked: likes.includes(user._id), likeCount: likes.length });
+    // setIsLiked(likes.includes(user._id));
+    // setLikeCount(likes.length);
   }, []);
 
   const toogleLike = async () => {
-    try {
-      axiosInstance.post("/community-posts/like", {
+    axiosInstance
+      .post("/community-posts/like", {
         postId: id,
+      })
+      .catch((err) => {
+        setLike((prev) => {
+          if (prev.isLiked) {
+            return { isLiked: false, likeCount: prev.likeCount - 1 };
+          } else {
+            return { isLiked: true, likeCount: prev.likeCount + 1 };
+          }
+        });
+        if (err instanceof AxiosError) {
+          if (err.status === 403) {
+            toast.error(err.response.data.message);
+          }
+        }
       });
-      setIsLiked(!isLiked);
-      if (isLiked) {
-        setLikeCount(likeCount - 1);
+
+    setLike((prev) => {
+      if (prev.isLiked) {
+        return { isLiked: false, likeCount: prev.likeCount - 1 };
       } else {
-        setLikeCount(likeCount + 1);
+        return { isLiked: true, likeCount: prev.likeCount + 1 };
       }
-    } catch (err) {
-      setIsLiked(!isLiked);
-      if (isLiked) {
-        setLikeCount(likeCount - 1);
-      } else {
-        setLikeCount(likeCount + 1);
-      }
-    }
+    });
   };
 
   return (
@@ -70,13 +82,13 @@ const Post = ({ id, author, likes, content, media, createdAt }) => {
       <div className={style.postReact}>
         <span>
           <Image
-            src={isLiked ? "/assets/like.png" : "/assets/notlike.png"}
+            src={like.isLiked ? "/assets/like.png" : "/assets/notlike.png"}
             alt="post"
             width={20}
             height={20}
             onClick={toogleLike}
           />
-          {formatNumber(likeCount)}
+          {formatNumber(like.likeCount)}
         </span>
       </div>
     </div>

@@ -1,6 +1,8 @@
+import Community from "@/server/models/Community";
 import CommunityPost from "@/server/models/CommunityPost";
 import { verifyToken } from "@/server/utils/jwt";
 import connectDb from "@/server/utils/mongodb";
+import permit from "@/server/utils/permit";
 
 const toogleLike = async (req, res) => {
   try {
@@ -8,6 +10,26 @@ const toogleLike = async (req, res) => {
     const { postId } = req.body;
     const post = await CommunityPost.findById(postId);
     if (!post) return res.status(404).json({ error: "Post not found" });
+
+    const community = await Community.findById(post.communityId);
+    const member = community.members.find(
+      (member) => member.userId.toString() === userId
+    );
+    const permitted = await permit.check(
+      {
+        key: userId,
+        attributes: {
+          role: member.role,
+          violations_count: member?.restriction?.violationsCount || 0,
+        },
+      },
+      "react",
+      "community"
+    );
+    if (!permitted) {
+      return res.status(403).json({ message: "Permission denied" });
+    }
+
     if (!post.likes.includes(userId)) {
       await post.updateOne({ $push: { likes: userId } });
     } else {

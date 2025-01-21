@@ -1,22 +1,33 @@
 import Community from "@/server/models/Community";
 import { verifyToken } from "@/server/utils/jwt";
 import connectDb from "@/server/utils/mongodb";
+import permit from "@/server/utils/permit";
 
 const createRule = async (req, res) => {
   try {
     const userId = req.userId;
     const { communityId, title, description } = req.body;
+
     const community = await Community.findById(communityId);
     if (!community) {
       return res.status(404).json({ message: "Community not found" });
     }
-    const isAllowed = community.members.find(
-      (member) => member.userId.toString() === userId && member.role === "admin"
+
+    const member = community.members.find(
+      (member) => member.userId.toString() === userId
     );
-    if (!isAllowed) {
-      return res.status(403).json({
-        message: "Only community admin and moderators can create rules",
-      });
+    const permitted = await permit.check(
+      {
+        key: userId,
+        attributes: {
+          role: member.role,
+        },
+      },
+      "create",
+      "community"
+    );
+    if (!permitted) {
+      return res.status(403).json({ message: "Unauthorized" });
     }
 
     community.rules.push({ title, description });
@@ -31,19 +42,27 @@ const editRule = async (req, res) => {
   try {
     const userId = req.userId;
     const { communityId, ruleId, title, description } = req.body;
+
     const community = await Community.findById(communityId);
     if (!community) {
       return res.status(404).json({ message: "Community not found" });
     }
-    const isAllowed = community.members.find(
-      (member) =>
-        member.userId.toString() === userId &&
-        (member.role === "admin" || member.role === "moderator")
+
+    const member = community.members.find(
+      (member) => member.userId.toString() === userId
     );
-    if (!isAllowed) {
-      return res.status(403).json({
-        message: "Only community admin and moderators can create rules",
-      });
+    const permitted = await permit.check(
+      {
+        key: userId,
+        attributes: {
+          role: member.role,
+        },
+      },
+      "update",
+      "community"
+    );
+    if (!permitted) {
+      return res.status(403).json({ message: "Unauthorized" });
     }
 
     const ruleIndex = community.rules.findIndex(
@@ -70,15 +89,22 @@ const deleteRule = async (req, res) => {
     if (!community) {
       return res.status(404).json({ message: "Community not found" });
     }
-    const isAllowed = community.members.find(
-      (member) =>
-        member.userId.toString() === userId &&
-        (member.role === "admin" || member.role === "moderator")
+
+    const member = community.members.find(
+      (member) => member.userId.toString() === userId
     );
-    if (!isAllowed) {
-      return res.status(403).json({
-        message: "Only community admin and moderators can create rules",
-      });
+    const permitted = await permit.check(
+      {
+        key: userId,
+        attributes: {
+          role: member.role,
+        },
+      },
+      "delete",
+      "community"
+    );
+    if (!permitted) {
+      return res.status(403).json({ message: "Unauthorized" });
     }
 
     const remainingRules = community.rules.filter(

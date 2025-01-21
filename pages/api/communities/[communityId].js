@@ -2,6 +2,7 @@ import Community from "@/server/models/Community";
 import { hasDisallowedFields } from "@/server/utils";
 import { verifyToken } from "@/server/utils/jwt";
 import connectDb from "@/server/utils/mongodb";
+import permit from "@/server/utils/permit";
 
 const getCommunity = async (req, res) => {
   try {
@@ -22,13 +23,21 @@ const updateCommunity = async (req, res) => {
       return res.status(404).json({ message: "Community not found" });
     }
 
-    const isAllowed = community.members.find(
-      (member) => member.userId.toString() === userId && member.role === "admin"
+    const member = community.members.find(
+      (member) => member.userId.toString() === userId
     );
-    if (!isAllowed) {
-      return res.status(403).json({
-        message: "Only community admin and moderators can create rules",
-      });
+    const permitted = await permit.check(
+      {
+        key: userId,
+        attributes: {
+          role: member.role,
+        },
+      },
+      "update",
+      "community"
+    );
+    if (!permitted) {
+      return res.status(403).json({ message: "Unauthorized" });
     }
 
     let disAllowedFields = ["createdAt", "updatedAt", "ownerId"];

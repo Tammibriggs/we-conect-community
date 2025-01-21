@@ -3,6 +3,7 @@ import User from "@/server/models/User";
 import communityData from "@/server/utils/communityData";
 import { generateAccessToken } from "@/server/utils/jwt";
 import connectDb from "@/server/utils/mongodb";
+import permit from "@/server/utils/permit";
 
 const signIn = async (req, res) => {
   try {
@@ -16,6 +17,15 @@ const signIn = async (req, res) => {
       // After that chech if the dummuy community document exist,
       // if it does add new user as a member else create the document and add new user as admin
       user = await User.create({ username });
+      await permit.api.syncUser({
+        key: user._id,
+        role_assignments: [
+          {
+            role: "user",
+            tenant: "default",
+          },
+        ],
+      });
       const community = await Community.findById(communityData._id);
       if (community) {
         await community.updateOne({
