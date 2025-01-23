@@ -76,12 +76,16 @@ const createPost = async (req, res) => {
       media,
       communityId,
     };
-    const presets = community.moderationFilters.presets;
     const {
       post: updatedPost,
       member: updatedMember,
       violations,
-    } = await checkPostForViolations(post, member, presets);
+    } = await checkPostForViolations(
+      post,
+      req.file,
+      member,
+      community.moderationFilters
+    );
     post = updatedPost;
     member = updatedMember;
 

@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { configureAxios } from "@/utils/axiosInstance";
 import { UserContext } from "@/providers/MyContext";
 import communityData from "@/server/utils/communityData";
+import { CircleNotch } from "@phosphor-icons/react";
 
 const exampleRules = [
   {
@@ -106,8 +107,11 @@ function CreateCommunityRule({
         <Button
           disabled={isLoading}
           variant="contained"
+          startIcon={
+            isLoading && <CircleNotch size={20} className="animate-spin" />
+          }
           onClick={addRule}
-          className="normal-case disabled:bg-slate-300 block mt-4 bg-teal-500 ml-auto rounded-full"
+          className="normal-case disabled:bg-slate-300 flex items-center mt-4 bg-teal-500 ml-auto rounded-full"
         >
           Create
         </Button>

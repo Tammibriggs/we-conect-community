@@ -165,7 +165,6 @@ function Community() {
           </div>
         </div>
       </div>
-      {console.log(community?.moderationFilters, "This is the moderation rule")}
       <AutoMod
         open={isAutoMod}
         onClose={() => setIsAutoMod(false)}

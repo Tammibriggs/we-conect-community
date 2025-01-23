@@ -33,8 +33,8 @@ const PresetFilterSchema = new Schema({
         actionConfig: {
           timeoutDuration: {
             type: String,
-            default: "1-hour",
-            enum: ["1-hour", "1-day", "1-week"],
+            default: "1-min",
+            enum: ["1-min", "1-hour", "1-day"],
           },
         },
         enabled: {
@@ -63,7 +63,6 @@ const GeneratedFiltersSchema = new Schema({
           type: String,
           required: true,
         },
-        enabled: { type: Boolean, required: true, default: false },
       },
     ],
     required: true,

@@ -1,12 +1,14 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import Modal from "./Modal";
 import { Button, Checkbox, IconButton, MenuItem, Select } from "@mui/material";
 import { teal } from "@mui/material/colors";
 import {
   CaretDown,
   CaretUp,
+  CircleNotch,
   FloppyDisk,
   Notebook,
+  TrashSimple,
   X,
 } from "@phosphor-icons/react";
 import Android12Switch from "./Andriod12Switch";
@@ -29,7 +31,9 @@ function AutoMod({
 
   const [filtersSettings, setFiltersSettings] = useState(filters);
   const [isExpandBlockSpam, setIsExpandBlockSpam] = useState(false);
-  const [customFilterText, setCustomFilterText] = useState("");
+  const [customFilterTitle, setCustomFilterTitle] = useState("");
+  const [isEvaluatingFilter, setIsEvaluatingFilter] = useState(false);
+  const [filterEvaluationResult, setFilterElavationResult] = useState({});
   const [isTimeoutMember, setIsTimeoutMember] = useState(false);
   const [timeoutConfigFilterName, setTimeoutConfigFilterName] = useState("");
   const [isSavingSettings, setIsSavingSetting] = useState(false);
@@ -40,6 +44,30 @@ function AutoMod({
       setFiltersSettings(clonedFilters);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (customFilterTitle.length) {
+      const eveluateCustomFilter = async () => {
+        setIsEvaluatingFilter(true);
+        try {
+          const res = await axiosInstance.get(
+            `/communities/generated-filters?filterTitle=${customFilterTitle}`
+          );
+
+          setFilterElavationResult(res.data);
+        } catch {
+        } finally {
+          setIsEvaluatingFilter(false);
+        }
+      };
+      const timer = setTimeout(eveluateCustomFilter, 1500);
+      return () => {
+        clearTimeout(timer);
+      };
+    } else {
+      setFilterElavationResult({});
+    }
+  }, [customFilterTitle]);
 
   const tooglePresets = (e) => {
     const updatedFiltersSetting = { ...filtersSettings };
@@ -137,7 +165,7 @@ function AutoMod({
         return actionConfig.timeoutDuration;
       }
     }
-    return "1-hour";
+    return "1-min";
   };
 
   const getCritarionDescription = (criterion) => {
@@ -177,6 +205,39 @@ function AutoMod({
       toast.error("Something went wrong. Please try again");
     } finally {
       setIsSavingSetting(false);
+    }
+  };
+
+  const deleteGeneratedFilter = async (filterId) => {
+    try {
+      await axiosInstance.delete(`/communities/generated-filters`, {
+        data: { communityId: communityData._id, filterId },
+      });
+      const updatedFiltersSetting = { ...filtersSettings };
+      updatedFiltersSetting.generatedFilters.options =
+        updatedFiltersSetting.generatedFilters.options.filter(
+          (filter) => filter._id !== filterId
+        );
+      setFiltersSettings(updatedFiltersSetting);
+    } catch (err) {
+      toast.error("Something went wrong. Please try again");
+    }
+  };
+
+  const saveCustomFilter = async () => {
+    try {
+      const res = await axiosInstance.post(`/communities/generated-filters`, {
+        communityId: communityData._id,
+        filterTitle: filterEvaluationResult.title,
+        filterDescription: filterEvaluationResult.description,
+      });
+      const updatedFiltersSetting = { ...filtersSettings };
+      updatedFiltersSetting.generatedFilters.options = res.data;
+      setFilterElavationResult({});
+      setCustomFilterTitle("");
+      setFiltersSettings(updatedFiltersSetting);
+    } catch (err) {
+      toast.error("Something went wrong. Please try again");
     }
   };
 
@@ -411,8 +472,8 @@ function AutoMod({
               }`}
             >
               Specify the characteristics of posts that will determine whether
-              they should be blocked in your community (e.g., posts containing
-              memes or cartoons).
+              they should be blocked in your community (e.g., posts spreading
+              conspiracy theories about 5G).
             </p>
 
             <div
@@ -434,10 +495,14 @@ function AutoMod({
                     <input
                       id="custom-filter"
                       readOnly={!filtersSettings.generatedFilters?.enabled}
-                      value={customFilterText}
-                      maxLength={35}
-                      onChange={(e) => setCustomFilterText(e.target.value)}
-                      className="border-none bg-inherit px-2 flex-1 focus:outline-none"
+                      value={customFilterTitle}
+                      maxLength={50}
+                      onChange={(e) => setCustomFilterTitle(e.target.value)}
+                      className={`border-none bg-inherit px-2 flex-1 focus:outline-none ${
+                        !filtersSettings.generatedFilters?.enabled
+                          ? "cursor-default"
+                          : ""
+                      }`}
                       placeholder="posts with threats and insults"
                     />
                     <span
@@ -447,54 +512,96 @@ function AutoMod({
                           : "text-slate-600"
                       }`}
                     >
-                      {customFilterText.length}/35
+                      {customFilterTitle.length}/50
                     </span>
                   </div>
                   <IconButton
                     variant="contained"
-                    disabled={!customFilterText}
+                    onClick={saveCustomFilter}
+                    disabled={
+                      isEvaluatingFilter || !filterEvaluationResult.description
+                    }
                     className="rounded-r-md h-[45px] disabled:bg-slate-300 disabled:text-slate-500 self-end text-white rounded-none bg-orange-400"
                   >
                     <FloppyDisk size={25} />
                   </IconButton>
                 </div>
-                <div className="px-2 py-3 bg-slate-100 rounded-b-md">
-                  <div className="flex items-center justify-center gap-1">
-                    <Notebook size={20} /> Filter Note
-                  </div>
-                  <p className="text-center text-sm text-slate-700">
-                    A description of the action that the system will perform,
-                    based the information provided in the above input field.
-                  </p>
+                <div
+                  className={`px-2 py-3 min-h-[100px] grid place-content-center ${
+                    filterEvaluationResult.error
+                      ? "bg-red-100 border border-solid border-red-300"
+                      : "bg-slate-100"
+                  } rounded-b-md`}
+                >
+                  {!Object.keys(filterEvaluationResult).length &&
+                    !isEvaluatingFilter && (
+                      <>
+                        <div className="flex items-center justify-center gap-1">
+                          <Notebook size={20} /> Filter Note
+                        </div>
+                        <p className="text-center text-sm text-slate-700">
+                          A description of the action that will be carried out,
+                          based on the information provided in the above input
+                          field.
+                        </p>
+                      </>
+                    )}
+                  {!isEvaluatingFilter && (
+                    <>
+                      {filterEvaluationResult.description && (
+                        <>
+                          <div className="flex items-center justify-center gap-1">
+                            <Notebook size={20} /> Filter Note
+                          </div>
+                          <p className="text-center text-sm text-slate-700">
+                            {filterEvaluationResult.description}
+                          </p>
+                        </>
+                      )}
+                      {filterEvaluationResult.error && (
+                        <>
+                          <p className="text-center text-sm text-slate-700">
+                            {filterEvaluationResult.error}
+                          </p>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {isEvaluatingFilter && (
+                    <CircleNotch className="animate-spin" size={20} />
+                  )}
                 </div>
               </div>
 
               <ul className="mt-5 list-disc list-outside ml-7 grid gap-4">
-                {/* <li className="marker:text-3xl marker:text-teal-600">
-                  <div className="flex gap-1">
-                    <div className="flex-1">
-                      <span className="font-semibold relative -top-1">
-                        Block request to do homework or
-                      </span>
-                      <div className="text-sm px-2">
-                        <div className="flex mb-1 items-center justify-center gap-1 w-fit">
-                          <Notebook size={15} /> Filter note
+                {filtersSettings.generatedFilters.options?.map((filter) => (
+                  <li
+                    key={filter._id}
+                    className="marker:text-3xl marker:text-teal-600"
+                  >
+                    <div className="flex gap-1">
+                      <div className="flex-1">
+                        <span className="font-semibold relative -top-1">
+                          {filter.title}
+                        </span>
+                        <div className="text-sm px-2">
+                          <div className="flex mb-1 items-center justify-center gap-1 w-fit">
+                            <Notebook size={15} /> Filter note
+                          </div>
+                          <p>{filter.description}</p>
                         </div>
-                        <p>
-                          Block content with request to do home work or tasks
-                        </p>
+                      </div>
+                      <div>
+                        <IconButton
+                          onClick={() => deleteGeneratedFilter(filter._id)}
+                          className="block rounded-md mt-1 bg-slate-200"
+                        >
+                          <TrashSimple size={20} />
+                        </IconButton>
                       </div>
                     </div>
-                    <div>
-                      <IconButton className="rounded-md block bg-slate-200">
-                        <PencilSimpleLine className="" size={20} />
-                      </IconButton>
-                      <IconButton className="block rounded-md mt-1 bg-slate-200">
-                        <TrashSimple size={20} />
-                      </IconButton>
-                    </div>
-                  </div>
-                </li> */}
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
@@ -523,9 +630,9 @@ function AutoMod({
             value={getFilterTimeoutDuration()}
             onChange={handleChangeTimeoutDuration}
           >
+            <MenuItem value="1-min">1 minute</MenuItem>
             <MenuItem value="1-hour">1 hour</MenuItem>
             <MenuItem value="1-day">1 day</MenuItem>
-            <MenuItem value="1-week">1 week</MenuItem>
           </Select>
 
           <Button

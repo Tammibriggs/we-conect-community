@@ -88,7 +88,7 @@ const Share = ({ createPost }) => {
               onClick={() => mediaRef.current.click()}
             >
               <ImageSquare size={25} className="mr-1" weight="fill" />
-              Photo/Video
+              Photo
             </div>
             <button
               className={`button ${style["ps-button"]}`}
@@ -101,7 +101,7 @@ const Share = ({ createPost }) => {
               <input
                 type="file"
                 ref={mediaRef}
-                accept="image/png, image/gif, image/jpeg, video/*"
+                accept="image/png, image/gif, image/jpeg, image/webp"
                 onChange={(e) => onMediaChange(e)}
               />
             </div>

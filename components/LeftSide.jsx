@@ -61,7 +61,11 @@ function LeftSide() {
         profileImage={user?.profilePicture}
         bio={user?.bio}
       />
-      <Modal open={user === null} customModal="w-[400px] shadow-sm">
+      <Modal
+        open={user === null}
+        customContainer="z-[100%]"
+        customModal="w-[400px] shadow-sm"
+      >
         <div className="shadow-sm">
           <label htmlFor="username" className="font-medium mb-1 block">
             Username
